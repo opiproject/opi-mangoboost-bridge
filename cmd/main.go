@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/opiproject/gospdk/spdk"
-	// fe "github.com/opiproject/opi-mangoboost-bridge/pkg/frontend"
+	fe "github.com/opiproject/opi-mangoboost-bridge/pkg/frontend"
 	"github.com/opiproject/opi-smbios-bridge/pkg/inventory"
 	"github.com/opiproject/opi-spdk-bridge/pkg/backend"
 	"github.com/opiproject/opi-spdk-bridge/pkg/middleend"
@@ -120,13 +120,13 @@ func runGrpcServer(grpcPort int, spdkAddress string, tlsFiles string, store gokv
 
 	jsonRPC := spdk.NewClient(spdkAddress)
 	// Mango StorageBoost - NTI
-	// frontendOpiMangoboostServer := fe.NewServer(jsonRPC, store)
+	frontendOpiMangoboostServer := fe.NewServer(jsonRPC, store)
 	backendOpiSpdkServer := backend.NewServer(jsonRPC, store)
 	middleendOpiMangoboostServer := middleend.NewCustomizedServer(
 		jsonRPC, store, spdk.TweakModeJoinNegLbaWithLba,
 	)
 
-	// pb.RegisterFrontendNvmeServiceServer(s, frontendOpiMangoboostServer)
+	pb.RegisterFrontendNvmeServiceServer(s, frontendOpiMangoboostServer)
 	pb.RegisterNvmeRemoteControllerServiceServer(s, backendOpiSpdkServer)
 	pb.RegisterNullVolumeServiceServer(s, backendOpiSpdkServer)
 	pb.RegisterMallocVolumeServiceServer(s, backendOpiSpdkServer)
