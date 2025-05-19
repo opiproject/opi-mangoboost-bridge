@@ -34,7 +34,48 @@ Run `docker-compose up -d` or `docker compose up -d`
 
 ## Usage
 
-TBU
+### NVMe oF Target
+
+After starting Mango StorageBoost NTT service, you can use OPI to configure NVMe of Target.
+
+```bash
+grpc_cli call --json_input --json_output $BRIDGE_ADDR CreateNvmeSubsystem "{nvme_subsystem : {spec : {nqn: 'nqn.2019-07.io.spdk:cnode0', serial_number: 'MB_NVMF', model_number: 'MangoBoost NVMF', max_namespaces: 256}}, nvme_subsystem_id : 'subsystem0'}"
+grpc_cli call --json_input --json_output $BRIDGE_ADDR ListNvmeSubsystems "{}"
+grpc_cli call --json_input --json_output $BRIDGE_ADDR GetNvmeSubsystem "{name : 'nvmeSubsystems/subsystem0'}"
+grpc_cli call --json_input --json_output $BRIDGE_ADDR CreateNvmeRemoteController "{nvme_remote_controller : {multipath: 'NVME_MULTIPATH_MULTIPATH'}, nvme_remote_controller_id: 'nvmetcpf3'}"
+grpc_cli call --json_input --json_output $BRIDGE_ADDR ListNvmeRemoteControllers "{}"
+grpc_cli call --json_input --json_output $BRIDGE_ADDR CreateNvmePath "{parent: 'nvmeRemoteControllers/nvmetcpf3', nvme_path : {traddr:'0000:f3:00.0', trtype:'NVME_TRANSPORT_TYPE_PCIE'}, nvme_path_id: 'nvmepcief3path0'}"
+grpc_cli call --json_input --json_output $BRIDGE_ADDR ListNvmePaths "{parent: 'nvmeRemoteControllers/nvmetcpf3'}"
+```
+
+You can get the bdev name by running the rpc script inside the spdk directory.
+
+```bash
+sudo python ./scripts/rpc.py -s /tmp/run/spdk.sock bdev_get_bdevs
+```
+
+Use the bdev name to create a namespace.
+
+```bash
+grpc_cli call --json_input --json_output $BRIDGE_ADDR CreateNvmeNamespace "{parent: 'nvmeSubsystems/subsystem0', nvme_namespace : {spec : {volume_name_ref : 'nvmetcpf3n1'} }, nvme_namespace_id: 'namespace0'}"
+grpc_cli call --json_input --json_output $BRIDGE_ADDR ListNvmeNamespaces "{parent : 'nvmeSubsystems/subsystem0'}"
+```
+
+Then, make an NVMe controller.
+
+```bash
+grpc_cli call --json_input --json_output $BRIDGE_ADDR CreateNvmeController "{'parent':'nvmeSubsystems/subsystem0','nvme_controller':{'spec':{'nvme_controller_id':0,'fabrics_id':{'traddr': '200.1.1.100', trsvcid: '4420', adrfam: 'NVME_ADDRESS_FAMILY_IPV4'}, 'trtype': 'NVME_TRANSPORT_TYPE_TCP'}},'nvme_controller_id':'controller0'}"
+grpc_cli call --json_input --json_output $BRIDGE_ADDR ListNvmeControllers "{parent : 'nvmeSubsystems/subsystem0'}"
+```
+
+Now, from the initiator, you can discover the target and make a connection. To delete the target configuration, first disconnect from the initiator and run below commands.
+
+```bash
+grpc_cli call --json_input --json_output $BRIDGE_ADDR DeleteNvmeController "{name : 'nvmeSubsystems/subsystem0/nvmeControllers/controller0'}"
+grpc_cli call --json_input --json_output $BRIDGE_ADDR DeleteNvmeNamespace "{name : 'nvmeSubsystems/subsystem0/nvmeNamespaces/namespace0'}"
+grpc_cli call --json_input --json_output $BRIDGE_ADDR DeleteNvmePath "{name: 'nvmeRemoteControllers/nvmetcpf3/nvmePaths/nvmepcief3path0'}"
+grpc_cli call --json_input --json_output $BRIDGE_ADDR DeleteNvmeRemoteController "{name: 'nvmeRemoteControllers/nvmetcpf3'}"
+```
 
 ## I Want To Contribute
 
