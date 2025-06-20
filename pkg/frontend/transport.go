@@ -7,8 +7,8 @@ package frontend
 
 import (
 	"context"
+	"fmt"
 	"log"
-	"strconv"
 
 	"github.com/opiproject/gospdk/spdk"
 	pb "github.com/opiproject/opi-api/storage/v1alpha1/gen/go"
@@ -46,14 +46,16 @@ func (c *nvmeNhiTransport) CreateController(
 		return status.Error(codes.InvalidArgument, "only port 0 is supported")
 	}
 
-	if ctrlr.GetSpec().GetPcieId().GetPhysicalFunction().GetValue() != 0 {
+	physicalFunction := ctrlr.GetSpec().GetPcieId().GetPhysicalFunction().GetValue()
+
+	if physicalFunction != 0 && physicalFunction != 1 {
 		return status.Error(codes.InvalidArgument,
-			"only physical_function 0 is supported")
+			"Only physical_function 0 or 1 are supported")
 	}
 
 	if subsys.GetSpec().GetHostnqn() != "" {
 		return status.Error(codes.InvalidArgument,
-			"hostnqn for subsystem is not supported for nhi")
+			"Hostnqn for subsystem is not supported for nhi")
 	}
 
 	maxNsq := ctrlr.GetSpec().GetMaxNsq()
@@ -65,8 +67,9 @@ func (c *nvmeNhiTransport) CreateController(
 
 	params := c.params(ctrlr, subsys)
 	if maxNsq > 0 {
-		params.NumQueues = int(maxNsq) + 1 // + 1 admin queue
+		params.NumQueues = int(maxNsq)
 	}
+
 	var result spdk.NvmfSubsystemAddListenerResult
 	err := c.rpc.Call(ctx, "nvmf_subsystem_add_listener", &params, &result)
 	if err != nil {
@@ -108,8 +111,19 @@ func (c *nvmeNhiTransport) params(
 	result := models.NhiNvmfSubsystemAddListenerParams{}
 	result.Nqn = subsys.GetSpec().GetNqn()
 	result.ListenAddress.Trtype = "NHI"
-	result.ListenAddress.Traddr = strconv.Itoa(int(ctrlr.GetSpec().GetPcieId().GetPhysicalFunction().GetValue()))
-	result.ListenAddress.Trsvcid = strconv.Itoa(int(ctrlr.GetSpec().GetPcieId().GetPhysicalFunction().GetValue()))
+	result.ListenAddress.Traddr = calculateTransportAddr(ctrlr.GetSpec().GetPcieId())
+	result.ListenAddress.Trsvcid = ctrlr.GetSpec().GetFabricsId().GetTrsvcid()
+	result.HostNvmeID = -1
+	result.EnableIoOffload = true
 
 	return result
+}
+
+// calculateTransportAddr generates the BDF transport address for the NHI
+func calculateTransportAddr(pci *pb.PciEndpoint) string {
+	// For NHI, we use a fixed format for the transport address
+	// and only the physical function is selectable.
+	return fmt.Sprintf("0000:01:00.%x",
+		pci.PhysicalFunction.GetValue(),
+	)
 }

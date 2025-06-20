@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// CreateNvmeSubsystem creates a new NVMe subsystem with the specified parameters
 func (s *Server) CreateNvmeSubsystem(ctx context.Context, in *pb.CreateNvmeSubsystemRequest) (*pb.NvmeSubsystem, error) {
 	// check input correctness
 	if err := s.validateCreateNvmeSubsystemRequest(in); err != nil {

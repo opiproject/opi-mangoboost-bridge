@@ -29,6 +29,7 @@ const (
 	defaultNumIoQueues    = 128
 )
 
+// CreateNvmePath creates a new NVMe path with the specified parameters
 func (s *Server) CreateNvmePath(ctx context.Context, in *pb.CreateNvmePathRequest) (*pb.NvmePath, error) {
 	// check input correctness
 	if err := s.validateCreateNvmePathRequest(in); err != nil {

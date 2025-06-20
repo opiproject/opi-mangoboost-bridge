@@ -14,6 +14,7 @@ import (
 	"github.com/opiproject/gospdk/spdk"
 	pb "github.com/opiproject/opi-api/storage/v1alpha1/gen/go"
 	"github.com/opiproject/opi-spdk-bridge/pkg/frontend"
+	"github.com/opiproject/opi-spdk-bridge/pkg/utils"
 )
 
 // Server contains frontend related OPI services
@@ -21,9 +22,11 @@ type Server struct {
 	pb.FrontendNvmeServiceServer
 	pb.FrontendVirtioBlkServiceServer
 
-	nvme  *frontend.NvmeParameters
+	Nvme  *frontend.NvmeParameters
 	rpc   spdk.JSONRPC
 	store gokv.Store
+
+	keyToTemporaryFile func(pskKey []byte) (string, error)
 }
 
 // NewServer creates initialized instance of Nvme server
@@ -41,11 +44,14 @@ func NewServer(jsonRPC spdk.JSONRPC, store gokv.Store) *Server {
 			pb.NvmeTransportType_NVME_TRANSPORT_TYPE_TCP:  frontend.NewNvmeTCPTransport(jsonRPC),
 		},
 		NewVirtioVhiTransport())
+
 	return &Server{
-		opiSpdkServer,
-		opiSpdkServer,
-		&opiSpdkServer.Nvme,
-		jsonRPC,
-		store,
+		FrontendNvmeServiceServer:      opiSpdkServer,
+		FrontendVirtioBlkServiceServer: opiSpdkServer,
+
+		Nvme:               &opiSpdkServer.Nvme,
+		rpc:                jsonRPC,
+		store:              store,
+		keyToTemporaryFile: utils.KeyToTemporaryFile,
 	}
 }

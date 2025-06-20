@@ -21,8 +21,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// CreateNvmeNamespace creates a new NVMe namespace with the specified parameters
 func (s *Server) CreateNvmeNamespace(ctx context.Context, in *pb.CreateNvmeNamespaceRequest) (*pb.NvmeNamespace, error) {
-
 	// check input correctness
 	if err := s.validateCreateNvmeNamespaceRequest(in); err != nil {
 		return nil, err

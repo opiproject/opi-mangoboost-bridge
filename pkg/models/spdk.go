@@ -11,10 +11,11 @@ import "github.com/opiproject/gospdk/spdk"
 type NhiNvmfSubsystemAddListenerParams struct {
 	spdk.NvmfSubsystemAddListenerParams
 	EnableIoOffload bool `json:"enable_io_offload,omitempty"`
-	HostNvmeId      int  `json:"host_nvme_id,omitempty"`
+	HostNvmeID      int  `json:"host_nvme_id,omitempty"`
 	NumQueues       int  `json:"nr_queues"`
 }
 
+// NvmfSubsystemAddNsParams holds parameters for adding a namespace to an NVMf subsystem
 type NvmfSubsystemAddNsParams struct {
 	Nqn       string `json:"nqn"`
 	Namespace struct {
@@ -26,6 +27,7 @@ type NvmfSubsystemAddNsParams struct {
 	Pending bool `json:"pending,omitempty"`
 }
 
+// BdevNvmeAttachControllerParams holds parameters for attaching an NVMe controller
 type BdevNvmeAttachControllerParams struct {
 	Name    string `json:"name"`
 	Trtype  string `json:"trtype"`
@@ -50,6 +52,7 @@ type BdevNvmeAttachControllerParams struct {
 	SkipExamine    bool `json:"skip_examine,omitempty"`
 }
 
+// NvmfCreateSubsystemParams holds parameters for creating an NVMf subsystem
 type NvmfCreateSubsystemParams struct {
 	spdk.NvmfCreateSubsystemParams
 

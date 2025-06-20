@@ -17,6 +17,7 @@ import (
 	"github.com/opiproject/opi-spdk-bridge/pkg/utils"
 )
 
+// Server represents the backend server implementation that handles NVMe remote controller operations
 type Server struct {
 	pb.NvmeRemoteControllerServiceServer
 
@@ -27,6 +28,7 @@ type Server struct {
 	keyToTemporaryFile func(pskKey []byte) (string, error)
 }
 
+// NewServer creates and initializes a new Server instance with the provided JSON-RPC client and storage
 func NewServer(jsonRPC spdk.JSONRPC, store gokv.Store) *Server {
 	if jsonRPC == nil {
 		log.Panic("nil for JSONRPC is not allowed")
