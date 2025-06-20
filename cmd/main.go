@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"github.com/opiproject/gospdk/spdk"
+	be "github.com/opiproject/opi-mangoboost-bridge/pkg/backend"
 	fe "github.com/opiproject/opi-mangoboost-bridge/pkg/frontend"
 	"github.com/opiproject/opi-smbios-bridge/pkg/inventory"
-	"github.com/opiproject/opi-spdk-bridge/pkg/backend"
 	"github.com/opiproject/opi-spdk-bridge/pkg/middleend"
 	"github.com/opiproject/opi-spdk-bridge/pkg/utils"
 
@@ -119,18 +119,18 @@ func runGrpcServer(grpcPort int, spdkAddress string, tlsFiles string, store gokv
 	s := grpc.NewServer(serverOptions...)
 
 	jsonRPC := spdk.NewClient(spdkAddress)
-	// Mango StorageBoost - NTI
+
+	// MangoBoost Storage frontend/backend servers
 	frontendOpiMangoboostServer := fe.NewServer(jsonRPC, store)
-	backendOpiSpdkServer := backend.NewServer(jsonRPC, store)
+	backendOpiSpdkServer := be.NewServer(jsonRPC, store)
+
 	middleendOpiMangoboostServer := middleend.NewCustomizedServer(
 		jsonRPC, store, spdk.TweakModeJoinNegLbaWithLba,
 	)
 
 	pb.RegisterFrontendNvmeServiceServer(s, frontendOpiMangoboostServer)
 	pb.RegisterNvmeRemoteControllerServiceServer(s, backendOpiSpdkServer)
-	pb.RegisterNullVolumeServiceServer(s, backendOpiSpdkServer)
-	pb.RegisterMallocVolumeServiceServer(s, backendOpiSpdkServer)
-	pb.RegisterAioVolumeServiceServer(s, backendOpiSpdkServer)
+	// Null / Malloc / AIO volume service servers will soon be implemented
 	pb.RegisterMiddleendEncryptionServiceServer(s, middleendOpiMangoboostServer)
 	pb.RegisterMiddleendQosVolumeServiceServer(s, middleendOpiMangoboostServer)
 	pc.RegisterInventoryServiceServer(s, &inventory.Server{})
