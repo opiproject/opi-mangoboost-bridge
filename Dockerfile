@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2022-2023 Dell Inc, or its subsidiaries.
 
-FROM docker.io/library/golang:1.23.4-alpine3.21 as builder
+FROM docker.io/library/golang:1.23.4-alpine3.21 AS builder
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ RUN go mod download
 # build an app
 COPY cmd/ cmd/
 COPY pkg/ pkg/
-RUN go build -v -o /opi-mangoboost-bridge /app/cmd/...
+RUN go build -v -o /opi-mangoboost-bridge ./cmd/...
 
 # second stage to reduce image size
 FROM alpine:3.21
