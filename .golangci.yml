@@ -23,7 +23,6 @@ linters:
     - bodyclose
     - dogsled
     - errcheck
-    - copyloopvar
     - funlen
     - gochecknoinits
     - gocognit
