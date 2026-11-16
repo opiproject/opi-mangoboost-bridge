@@ -14,17 +14,12 @@
 [![GitHub stars](https://img.shields.io/github/stars/opiproject/opi-mangoboost-bridge.svg?style=flat-square&label=github%20stars)](https://github.com/opiproject/opi-mangoboost-bridge)
 [![GitHub Contributors](https://img.shields.io/github/contributors/opiproject/opi-mangoboost-bridge.svg?style=flat-square)](https://github.com/opiproject/opi-mangoboost-bridge/graphs/contributors)
 
-This repo includes OPI Mangoboost bridge API for DPUs, particularly OPI storage APIs for NVMe/TCP initiator and target offloads.
-For additional information, please refer to the links below.
+This repo includes the OPI MangoBoost bridge, which serves the OPI storage APIs for the MangoBoost BoostX NVMe-oF/RDMA target (NRT).
+The bridge translates OPI API calls into JSON-RPC calls to the MangoBoost SPDK target, which offloads the NVMe-oF/RDMA data path to the BoostX hardware.
 
-- [Mango StorageBoost - NTI](https://www.mangoboost.io/products/hardware/mango-storageboost-tm-nti)
-- [Mango StorageBoost - NTT](https://www.mangoboost.io/products/hardware/mango-storageboost-tm-ntt)
-
-The diagram below demonstrates an example of OPI-enabled workflows for xPU-based NVMe-oF initiator and target deployments.
-Running on an xPU, the bridge translates and forwards OPI API commands to the MangoBoost SDK for service management and configuration.
-On both the initiator and target, the NVMe/TCP data path is fully offloaded to the xPU hardware without any involvement of host and SoC CPU cores.
-
-![opi-mangoboost-bridge system overview](doc/images/opi-mangoboost-bridge_system-overview.png "opi-mangoboost-bridge system overview")
+At startup the bridge creates the SPDK RDMA transport with hardware offload, unless one already exists, and optionally adds an RDMA discovery listener.
+Each OPI NVMe controller with the RDMA transport becomes an RDMA listener of its subsystem.
+Volumes come from the AIO, Null and Malloc volume services or from remote NVMe controllers.
 
 ## Getting started
 
@@ -34,7 +29,33 @@ Run `docker-compose up -d` or `docker compose up -d`
 
 ## Usage
 
-TBU
+Start the MangoBoost SPDK target, then the bridge:
+
+```bash
+opi-mangoboost-bridge -spdk_addr=/var/tmp/spdk.sock -redis_addr=127.0.0.1:6379 \
+  -discovery_addr=192.168.1.10:8009 -min_cntlid=1 -max_cntlid=999
+```
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `-offload` | `true` | Enable BoostX hardware offload on the RDMA transport; `false` works with stock SPDK |
+| `-discovery_addr` | empty | RDMA discovery listener in `ip:port` form; empty skips it |
+| `-min_cntlid`, `-max_cntlid` | `0` | Controller ID range of new subsystems, so that targets exporting the same subsystem do not collide; `0` keeps the SPDK default |
+
+Export a Malloc volume over NVMe-oF/RDMA:
+
+```bash
+grpcurl -plaintext -d '{"malloc_volume_id": "mal0", "malloc_volume": {"block_size": 512, "blocks_count": 262144}}' \
+  localhost:50051 opi_api.storage.v1.MallocVolumeService.CreateMallocVolume
+grpcurl -plaintext -d '{"nvme_subsystem_id": "subsys0", "nvme_subsystem": {"spec": {"nqn": "nqn.2022-09.io.spdk:opi0", "serial_number": "SN0001", "model_number": "BoostX NRT", "max_namespaces": 32}}}' \
+  localhost:50051 opi_api.storage.v1.FrontendNvmeService.CreateNvmeSubsystem
+grpcurl -plaintext -d '{"parent": "nvmeSubsystems/subsys0", "nvme_namespace_id": "ns0", "nvme_namespace": {"spec": {"volume_name_ref": "mal0", "host_nsid": 1}}}' \
+  localhost:50051 opi_api.storage.v1.FrontendNvmeService.CreateNvmeNamespace
+grpcurl -plaintext -d '{"parent": "nvmeSubsystems/subsys0", "nvme_controller_id": "ctrl0", "nvme_controller": {"spec": {"trtype": "NVME_TRANSPORT_TYPE_RDMA", "fabrics_id": {"traddr": "192.168.1.10", "trsvcid": "4420", "adrfam": "NVME_ADDRESS_FAMILY_IPV4"}}}}' \
+  localhost:50051 opi_api.storage.v1.FrontendNvmeService.CreateNvmeController
+```
+
+Connect from a host with `nvme connect -t rdma -a 192.168.1.10 -s 4420 -n nqn.2022-09.io.spdk:opi0`.
 
 ## I Want To Contribute
 

@@ -7,69 +7,46 @@ package frontend
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/opiproject/gospdk/spdk"
 	pb "github.com/opiproject/opi-api/storage/v1alpha1/gen/go"
-	"github.com/opiproject/opi-mangoboost-bridge/pkg/models"
 	"github.com/opiproject/opi-spdk-bridge/pkg/frontend"
+	"github.com/opiproject/opi-spdk-bridge/pkg/utils"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-// Nvme Host Interface (NHI)
-type nvmeNhiTransport struct {
+// NVMe-oF/RDMA listener, served by the BoostX NRT target
+type nvmeRdmaTransport struct {
 	rpc spdk.JSONRPC
 }
 
 // build time check that struct implements interface
-var _ frontend.NvmeTransport = (*nvmeNhiTransport)(nil)
+var _ frontend.NvmeTransport = (*nvmeRdmaTransport)(nil)
 
-// NewNvmeNhiTransport creates a new instance of a NvmeTransport for nhi
-func NewNvmeNhiTransport(rpc spdk.JSONRPC) frontend.NvmeTransport {
+// NewNvmeRdmaTransport creates a new instance of a NvmeTransport for rdma
+func NewNvmeRdmaTransport(rpc spdk.JSONRPC) frontend.NvmeTransport {
 	if rpc == nil {
 		log.Panicf("rpc cannot be nil")
 	}
 
-	return &nvmeNhiTransport{
+	return &nvmeRdmaTransport{
 		rpc: rpc,
 	}
 }
 
-func (c *nvmeNhiTransport) CreateController(
+func (c *nvmeRdmaTransport) CreateController(
 	ctx context.Context,
 	ctrlr *pb.NvmeController,
 	subsys *pb.NvmeSubsystem,
 ) error {
-	if ctrlr.GetSpec().GetPcieId().GetPortId().GetValue() != 0 {
-		return status.Error(codes.InvalidArgument, "only port 0 is supported")
-	}
-
-	physicalFunction := ctrlr.GetSpec().GetPcieId().GetPhysicalFunction().GetValue()
-
-	if physicalFunction != 0 && physicalFunction != 1 {
+	if len(subsys.GetSpec().GetPsk()) > 0 {
 		return status.Error(codes.InvalidArgument,
-			"Only physical_function 0 or 1 are supported")
-	}
-
-	if subsys.GetSpec().GetHostnqn() != "" {
-		return status.Error(codes.InvalidArgument,
-			"Hostnqn for subsystem is not supported for nhi")
-	}
-
-	maxNsq := ctrlr.GetSpec().GetMaxNsq()
-	maxNcq := ctrlr.GetSpec().GetMaxNcq()
-	if maxNsq != maxNcq {
-		return status.Error(codes.InvalidArgument,
-			"max_nsq and max_ncq must be equal")
+			"psk is not supported for rdma")
 	}
 
 	params := c.params(ctrlr, subsys)
-	if maxNsq > 0 {
-		params.NumQueues = int(maxNsq)
-	}
-
 	var result spdk.NvmfSubsystemAddListenerResult
 	err := c.rpc.Call(ctx, "nvmf_subsystem_add_listener", &params, &result)
 	if err != nil {
@@ -84,7 +61,7 @@ func (c *nvmeNhiTransport) CreateController(
 	return nil
 }
 
-func (c *nvmeNhiTransport) DeleteController(
+func (c *nvmeRdmaTransport) DeleteController(
 	ctx context.Context,
 	ctrlr *pb.NvmeController,
 	subsys *pb.NvmeSubsystem,
@@ -104,26 +81,18 @@ func (c *nvmeNhiTransport) DeleteController(
 	return nil
 }
 
-func (c *nvmeNhiTransport) params(
+func (c *nvmeRdmaTransport) params(
 	ctrlr *pb.NvmeController,
 	subsys *pb.NvmeSubsystem,
-) models.NhiNvmfSubsystemAddListenerParams {
-	result := models.NhiNvmfSubsystemAddListenerParams{}
+) spdk.NvmfSubsystemAddListenerParams {
+	fabricsID := ctrlr.GetSpec().GetFabricsId()
+
+	result := spdk.NvmfSubsystemAddListenerParams{}
 	result.Nqn = subsys.GetSpec().GetNqn()
-	result.ListenAddress.Trtype = "NHI"
-	result.ListenAddress.Traddr = calculateTransportAddr(ctrlr.GetSpec().GetPcieId())
-	result.ListenAddress.Trsvcid = ctrlr.GetSpec().GetFabricsId().GetTrsvcid()
-	result.HostNvmeID = -1
-	result.EnableIoOffload = true
+	result.ListenAddress.Trtype = "rdma"
+	result.ListenAddress.Traddr = fabricsID.GetTraddr()
+	result.ListenAddress.Trsvcid = fabricsID.GetTrsvcid()
+	result.ListenAddress.Adrfam = utils.OpiAdressFamilyToSpdk(fabricsID.GetAdrfam())
 
 	return result
-}
-
-// calculateTransportAddr generates the BDF transport address for the NHI
-func calculateTransportAddr(pci *pb.PciEndpoint) string {
-	// For NHI, we use a fixed format for the transport address
-	// and only the physical function is selectable.
-	return fmt.Sprintf("0000:01:00.%x",
-		pci.PhysicalFunction.GetValue(),
-	)
 }

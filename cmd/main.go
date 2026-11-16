@@ -54,6 +54,14 @@ func main() {
 	var redisAddress string
 	flag.StringVar(&redisAddress, "redis_addr", "127.0.0.1:6379", "Redis address in ip_address:port format")
 
+	var target fe.RdmaTargetConfig
+	flag.BoolVar(&target.Offload, "offload", true, "Enable BoostX NRT hardware offload on the RDMA transport")
+	flag.StringVar(&target.DiscoveryAddr, "discovery_addr", "", "RDMA discovery listener in ip_address:port format, e.g. 192.168.1.10:8009; empty skips it")
+
+	var minCntlid, maxCntlid int
+	flag.IntVar(&minCntlid, "min_cntlid", 0, "Lowest controller ID of new subsystems; 0 keeps the SPDK default")
+	flag.IntVar(&maxCntlid, "max_cntlid", 0, "Highest controller ID of new subsystems; 0 keeps the SPDK default")
+
 	flag.Parse()
 
 	// Create KV store for persistence
@@ -71,11 +79,17 @@ func main() {
 		}
 	}(store)
 
+	jsonRPC := spdk.NewClient(spdkAddress)
+	if err := fe.SetupRdmaTarget(context.Background(), jsonRPC, target); err != nil {
+		// The other services still work, so report it and keep serving
+		log.Printf("failed to set up the RDMA target: %v", err)
+	}
+
 	go runGatewayServer(grpcPort, httpPort)
-	runGrpcServer(grpcPort, spdkAddress, tlsFiles, store)
+	runGrpcServer(grpcPort, jsonRPC, tlsFiles, store, minCntlid, maxCntlid)
 }
 
-func runGrpcServer(grpcPort int, spdkAddress string, tlsFiles string, store gokv.Store) {
+func runGrpcServer(grpcPort int, jsonRPC spdk.JSONRPC, tlsFiles string, store gokv.Store, minCntlid, maxCntlid int) {
 	tp := utils.InitTracerProvider("opi-mangoboost-bridge")
 	defer func() {
 		if err := tp.Shutdown(context.Background()); err != nil {
@@ -118,10 +132,10 @@ func runGrpcServer(grpcPort int, spdkAddress string, tlsFiles string, store gokv
 	)
 	s := grpc.NewServer(serverOptions...)
 
-	jsonRPC := spdk.NewClient(spdkAddress)
-
 	// MangoBoost Storage frontend/backend servers
 	frontendOpiMangoboostServer := fe.NewServer(jsonRPC, store)
+	frontendOpiMangoboostServer.MinCntlid = minCntlid
+	frontendOpiMangoboostServer.MaxCntlid = maxCntlid
 	backendOpiSpdkServer := be.NewServer(jsonRPC, store)
 
 	middleendOpiMangoboostServer := middleend.NewCustomizedServer(
@@ -130,7 +144,9 @@ func runGrpcServer(grpcPort int, spdkAddress string, tlsFiles string, store gokv
 
 	pb.RegisterFrontendNvmeServiceServer(s, frontendOpiMangoboostServer)
 	pb.RegisterNvmeRemoteControllerServiceServer(s, backendOpiSpdkServer)
-	// Null / Malloc / AIO volume service servers will soon be implemented
+	pb.RegisterAioVolumeServiceServer(s, backendOpiSpdkServer)
+	pb.RegisterNullVolumeServiceServer(s, backendOpiSpdkServer)
+	pb.RegisterMallocVolumeServiceServer(s, backendOpiSpdkServer)
 	pb.RegisterMiddleendEncryptionServiceServer(s, middleendOpiMangoboostServer)
 	pb.RegisterMiddleendQosVolumeServiceServer(s, middleendOpiMangoboostServer)
 	pc.RegisterInventoryServiceServer(s, &inventory.Server{})
