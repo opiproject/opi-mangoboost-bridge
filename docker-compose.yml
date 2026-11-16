@@ -82,7 +82,8 @@ services:
         condition: service_completed_successfully
       opi-jaeger-test:
         condition: service_completed_successfully
-    command: ls opi-mangoboost-server:50051 opi_api.storage.v1.FrontendNvmeService -l
+    entrypoint: ["sh", "-c"]
+    command: ["grpc_cli ls opi-mangoboost-server:50051 opi_api.storage.v1.FrontendNvmeService -l; rc=$?; sleep 5; exit $rc"]
 
   opi-client:
     image: docker.io/opiproject/godpu:main
