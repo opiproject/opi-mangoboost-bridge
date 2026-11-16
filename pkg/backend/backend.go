@@ -17,9 +17,12 @@ import (
 	"github.com/opiproject/opi-spdk-bridge/pkg/utils"
 )
 
-// Server represents the backend server implementation that handles NVMe remote controller operations
+// Server represents the backend server implementation that handles NVMe remote controller and volume operations
 type Server struct {
 	pb.NvmeRemoteControllerServiceServer
+	pb.AioVolumeServiceServer
+	pb.NullVolumeServiceServer
+	pb.MallocVolumeServiceServer
 
 	rpc                spdk.JSONRPC
 	store              gokv.Store
@@ -52,6 +55,9 @@ func NewServer(jsonRPC spdk.JSONRPC, store gokv.Store) *Server {
 
 	return &Server{
 		NvmeRemoteControllerServiceServer: opiSpdkServer,
+		AioVolumeServiceServer:            opiSpdkServer,
+		NullVolumeServiceServer:           opiSpdkServer,
+		MallocVolumeServiceServer:         opiSpdkServer,
 		Volumes:                           volumes,
 		Pagination:                        pagination,
 		rpc:                               jsonRPC,

@@ -45,21 +45,6 @@ func (s *Server) CreateNvmeNamespace(ctx context.Context, in *pb.CreateNvmeNames
 		return nil, err
 	}
 
-	// Check if the subsystem has NvmeController, that is, if the subsystem is for NTI
-	// if so, Pending should be set to false
-	var pending = true
-
-	Blobarray := []*pb.NvmeController{}
-	for _, controller := range s.Nvme.Controllers {
-		Blobarray = append(Blobarray, controller)
-	}
-	if len(Blobarray) > 0 {
-		pending = false
-		log.Printf("Found an NvmeController for namespace %s, setting Pending to false", in.NvmeNamespace.Name)
-	} else {
-		log.Printf("No NvmeController found for namespace %s, setting Pending to true", in.NvmeNamespace.Name)
-	}
-
 	params := models.NvmfSubsystemAddNsParams{
 		Nqn: subsys.Spec.Nqn,
 		Namespace: struct {
@@ -69,7 +54,6 @@ func (s *Server) CreateNvmeNamespace(ctx context.Context, in *pb.CreateNvmeNames
 			Nsid:     int(in.NvmeNamespace.Spec.HostNsid),
 			BdevName: in.NvmeNamespace.Spec.VolumeNameRef,
 		},
-		Pending: pending,
 	}
 
 	var result spdk.NvmfSubsystemAddNsResult

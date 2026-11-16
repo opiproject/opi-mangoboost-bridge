@@ -60,6 +60,8 @@ func (s *Server) CreateNvmeSubsystem(ctx context.Context, in *pb.CreateNvmeSubsy
 		},
 		// TODO: "multipath" parameter is currently hardcoded to false. It should be able to take it as an input.
 		MultiPath: false,
+		MinCntlid: s.MinCntlid,
+		MaxCntlid: s.MaxCntlid,
 	}
 
 	var result spdk.NvmfCreateSubsystemResult

@@ -26,6 +26,12 @@ type Server struct {
 	rpc   spdk.JSONRPC
 	store gokv.Store
 
+	// MinCntlid and MaxCntlid bound the controller IDs of new subsystems,
+	// so that targets exporting the same subsystem do not collide; 0 keeps
+	// the SPDK default.
+	MinCntlid int
+	MaxCntlid int
+
 	keyToTemporaryFile func(pskKey []byte) (string, error)
 }
 
@@ -40,10 +46,10 @@ func NewServer(jsonRPC spdk.JSONRPC, store gokv.Store) *Server {
 	opiSpdkServer := frontend.NewCustomizedServer(
 		jsonRPC, store,
 		map[pb.NvmeTransportType]frontend.NvmeTransport{
-			pb.NvmeTransportType_NVME_TRANSPORT_TYPE_PCIE: NewNvmeNhiTransport(jsonRPC),
+			pb.NvmeTransportType_NVME_TRANSPORT_TYPE_RDMA: NewNvmeRdmaTransport(jsonRPC),
 			pb.NvmeTransportType_NVME_TRANSPORT_TYPE_TCP:  frontend.NewNvmeTCPTransport(jsonRPC),
 		},
-		NewVirtioVhiTransport())
+		frontend.NewVhostUserBlkTransport())
 
 	return &Server{
 		FrontendNvmeServiceServer:      opiSpdkServer,

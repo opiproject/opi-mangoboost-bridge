@@ -7,14 +7,6 @@ package models
 
 import "github.com/opiproject/gospdk/spdk"
 
-// NhiNvmfSubsystemAddListenerParams holds the parameters required to Delete a NVMf subsystem
-type NhiNvmfSubsystemAddListenerParams struct {
-	spdk.NvmfSubsystemAddListenerParams
-	EnableIoOffload bool `json:"enable_io_offload,omitempty"`
-	HostNvmeID      int  `json:"host_nvme_id,omitempty"`
-	NumQueues       int  `json:"nr_queues"`
-}
-
 // NvmfSubsystemAddNsParams holds parameters for adding a namespace to an NVMf subsystem
 type NvmfSubsystemAddNsParams struct {
 	Nqn       string `json:"nqn"`
@@ -23,8 +15,6 @@ type NvmfSubsystemAddNsParams struct {
 		Nsid     int    `json:"nsid,omitempty"`
 		BdevName string `json:"bdev_name"`
 	} `json:"namespace"`
-	// Custom params
-	Pending bool `json:"pending,omitempty"`
 }
 
 // BdevNvmeAttachControllerParams holds parameters for attaching an NVMe controller
@@ -58,4 +48,30 @@ type NvmfCreateSubsystemParams struct {
 
 	// Custom params
 	MultiPath bool `json:"multipath"`
+	MinCntlid int  `json:"min_cntlid,omitempty"`
+	MaxCntlid int  `json:"max_cntlid,omitempty"`
+}
+
+// NvmfCreateTransportParams holds parameters for creating an NVMf transport
+type NvmfCreateTransportParams struct {
+	Trtype string `json:"trtype"`
+
+	// Custom params: enables BoostX NRT hardware offload on the RDMA transport
+	EnableOffload bool `json:"enable_offload,omitempty"`
+}
+
+// NvmfTransport is an entry of the nvmf_get_transports result
+type NvmfTransport struct {
+	Trtype        string `json:"trtype"`
+	EnableOffload bool   `json:"enable_offload"`
+}
+
+// NvmfListener is an entry of the nvmf_subsystem_get_listeners result
+type NvmfListener struct {
+	Address struct {
+		Trtype  string `json:"trtype"`
+		Adrfam  string `json:"adrfam"`
+		Traddr  string `json:"traddr"`
+		Trsvcid string `json:"trsvcid"`
+	} `json:"address"`
 }
